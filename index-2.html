@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#0a0a12" />
+<title>Wirid Muslihah — Cahaya 40 Hari</title>
+<link rel="manifest" href="manifest.json" />
+<style>
+  html, body { margin:0; padding:0; background:#0a0a12; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+</style>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // ---- localStorage shim matching the window.storage API used by the component ----
+  window.storage = {
+    async get(key, shared) {
+      const raw = localStorage.getItem(key);
+      if (raw === null) throw new Error("Key not found: " + key);
+      return { key, value: raw, shared: !!shared };
+    },
+    async set(key, value, shared) {
+      localStorage.setItem(key, value);
+      return { key, value, shared: !!shared };
+    },
+    async delete(key, shared) {
+      localStorage.removeItem(key);
+      return { key, deleted: true, shared: !!shared };
+    },
+    async list(prefix, shared) {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!prefix || k.startsWith(prefix)) keys.push(k);
+      }
+      return { keys, prefix, shared: !!shared };
+    },
+  };
+</script>
+
+<script>
+  if (!window.React || !window.ReactDOM) {
+    document.getElementById("root").innerHTML =
+      '<div style="color:#f3ecd9;font-family:sans-serif;text-align:center;padding:40px 20px;">' +
+      'Tak dapat muat React dari internet.<br/>Sila buka guna Chrome/Safari biasa dengan internet aktif.' +
+      '</div>';
+  } else {
+  const { useState, useEffect, useCallback } = React;
+
+const AMALAN = [
+  {
+    id: "tasbih",
+    name: "Subhanallah wa bihamdih",
+    sub: "x100 sehari",
+    slots: [{ key: "all", label: "Hari ini", target: 100 }]
+  },
+  {
+    id: "hasyr",
+    name: "Al-Hasyr 21\u201324",
+    sub: "3x pagi \xB7 3x petang/malam",
+    ayahRange: { surah: 59, from: 21, to: 24 },
+    slots: [
+      { key: "pagi", label: "Pagi", target: 3 },
+      { key: "petang", label: "Petang/Malam", target: 3 }
+    ]
+  },
+  {
+    id: "taubah",
+    name: "At-Taubah 128\u2013129",
+    sub: "7x pagi \xB7 7x petang/malam",
+    ayahRange: { surah: 9, from: 128, to: 129 },
+    slots: [
+      { key: "pagi", label: "Pagi", target: 7 },
+      { key: "petang", label: "Petang/Malam", target: 7 }
+    ]
+  },
+  {
+    id: "baqarah",
+    name: "Al-Baqarah (2 ayat akhir)",
+    sub: "1x pagi \xB7 1x petang",
+    ayahRange: { surah: 2, from: 285, to: 286 },
+    slots: [
+      { key: "pagi", label: "Pagi", target: 1 },
+      { key: "petang", label: "Petang", target: 1 }
+    ]
+  },
+  {
+    id: "mulk",
+    name: "Surah Al-Mulk",
+    sub: "1x sehari",
+    ayahRange: { surah: 67, from: 1, to: 30 },
+    slots: [{ key: "all", label: "Hari ini", target: 1 }]
+  },
+  {
+    id: "waqiah",
+    name: "Surah Al-Waqiah",
+    sub: "1x sehari",
+    ayahRange: { surah: 56, from: 1, to: 96 },
+    slots: [{ key: "all", label: "Hari ini", target: 1 }]
+  }
+];
+const AYAT_CACHE_PREFIX = "ayat-cache:";
+const QUOTE_JAR = [
+  { text: "Bersama kesukaran, pasti ada kemudahan.", ref: "Al-Insyirah 5\u20136" },
+  { text: "Sesiapa bertawakal kepada Allah, Dia cukupkan segala keperluannya.", ref: "At-Talaq 3" },
+  { text: "Jangan berputus asa dari rahmat Allah.", ref: "Az-Zumar 53" },
+  { text: "Allah tidak membebankan seseorang melainkan apa yang termampu olehnya.", ref: "Al-Baqarah 286" },
+  { text: "Ingatlah Aku, nescaya Aku ingat kamu.", ref: "Al-Baqarah 152" },
+  { text: "Dengan mengingati Allah, hati menjadi tenang.", ref: "Ar-Ra'd 28" },
+  { text: "Berdoalah kepada-Ku, nescaya Aku perkenankan.", ref: "Ghafir 60" },
+  { text: "Sesungguhnya Allah bersama orang-orang yang sabar.", ref: "Al-Baqarah 153" },
+  { text: "Jika kamu bersyukur, nescaya Aku tambahkan nikmat-Ku.", ref: "Ibrahim 7" },
+  { text: "Allah tidak mengubah keadaan sesuatu kaum sehingga mereka mengubah diri sendiri.", ref: "Ar-Ra'd 11" },
+  { text: "Sebaik-baik amalan ialah yang berterusan, walaupun sedikit.", ref: "maksud hadith" },
+  { text: "Kekuatan seorang mukmin bukan pada ototnya, tapi pada penguasaan diri ketika marah.", ref: "maksud hadith" },
+  { text: "Dunia ini persinggahan; jangan letak hati terlalu berat padanya.", ref: "peringatan" },
+  { text: "Istighfar membuka pintu rezeki yang tak disangka.", ref: "rujuk Nuh 10\u201312" },
+  { text: "Selawat ke atas Nabi, satu selawat dibalas sepuluh kali ganda.", ref: "maksud hadith" },
+  { text: "Yang paling dekat dengan seorang hamba ialah ketika dia sujud \u2014 perbanyakkan doa di situ.", ref: "maksud hadith" },
+  { text: "Hati yang tenang bukan hati yang tiada ujian, tapi hati yang berzikir walau dalam ujian.", ref: "peringatan" },
+  { text: "Setiap kesusahan yang menimpa mukmin, walau tercucuk duri, ada penghapus dosa padanya.", ref: "maksud hadith" },
+  { text: "Jangan kau hina sedikit pun kebaikan, walaupun sekadar wajah ceria bila bertemu saudara.", ref: "maksud hadith" },
+  { text: "Sesungguhnya solat itu mencegah dari perbuatan keji dan mungkar.", ref: "Al-Ankabut 45" },
+  { text: "Boleh jadi kamu benci sesuatu, padahal ia baik untukmu.", ref: "Al-Baqarah 216" },
+  { text: "Allah maha mengetahui apa yang tersembunyi dalam dada.", ref: "Al-Mulk 13" },
+  { text: "Tidak ada satu pun yang bergerak di bumi melainkan rezekinya dijamin Allah.", ref: "Hud 6" },
+  { text: "Sebaik-baik manusia ialah yang paling bermanfaat kepada manusia lain.", ref: "kata hikmah popular" },
+  { text: "Kesabaran itu cahaya.", ref: "maksud hadith" },
+  { text: "Bertaqwalah kepada Allah di mana jua kau berada.", ref: "maksud hadith" },
+  { text: "Sesungguhnya bersama Allah tiada yang mustahil.", ref: "peringatan" },
+  { text: "Jangan lelah berdoa walau jawapan lambat \u2014 Allah tahu waktu terbaik.", ref: "peringatan" },
+  { text: "Sesungguhnya Allah tidak melihat rupa dan hartamu, tapi hati dan amalanmu.", ref: "maksud hadith" },
+  { text: "Redha itu bukan lemah \u2014 ia kekuatan menerima ketentuan dengan hati yang teguh.", ref: "peringatan" }
+];
+function pickRandomQuote() {
+  return QUOTE_JAR[Math.floor(Math.random() * QUOTE_JAR.length)];
+}
+async function fetchAyat(surahNumber) {
+  const url = `https://api.alquran.cloud/v1/surah/${surahNumber}/editions/quran-uthmani,ms.basmeih`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Gagal muat turun ayat");
+  const json = await res.json();
+  const [arabicEd, malayEd] = json.data;
+  return arabicEd.ayahs.map((a, i) => ({
+    number: a.numberInSurah,
+    arabic: a.text,
+    malay: malayEd.ayahs[i] ? malayEd.ayahs[i].text : ""
+  }));
+}
+const TIERS = [100, 500, 1e3];
+const TOTAL_DAYS = 40;
+const STORAGE_KEY = "wirid-muslihah:state";
+function todayStr(offset = 0) {
+  const d = /* @__PURE__ */ new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+function emptyDay(selawatTier, istighfarTier) {
+  const day = { selawatTier, selawatCount: 0, istighfarTier, istighfarCount: 0 };
+  AMALAN.forEach((a) => {
+    a.slots.forEach((s) => {
+      day[`${a.id}_${s.key}`] = 0;
+    });
+  });
+  return day;
+}
+function isDayComplete(day) {
+  if (!day) return false;
+  for (const a of AMALAN) {
+    for (const s of a.slots) {
+      if ((day[`${a.id}_${s.key}`] || 0) < s.target) return false;
+    }
+  }
+  if ((day.selawatCount || 0) < day.selawatTier) return false;
+  if ((day.istighfarCount || 0) < day.istighfarTier) return false;
+  return true;
+}
+function dayProgress(day) {
+  if (!day) return 0;
+  let done = 0, total = 0;
+  AMALAN.forEach(
+    (a) => a.slots.forEach((s) => {
+      total += s.target;
+      done += Math.min(day[`${a.id}_${s.key}`] || 0, s.target);
+    })
+  );
+  total += day.selawatTier + day.istighfarTier;
+  done += Math.min(day.selawatCount || 0, day.selawatTier);
+  done += Math.min(day.istighfarCount || 0, day.istighfarTier);
+  return total === 0 ? 0 : done / total;
+}
+function WiridMuslihahTracker() {
+  const [loaded, setLoaded] = useState(false);
+  const [startDate, setStartDate] = useState(null);
+  const [days, setDays] = useState({});
+  const [defaultSelawatTier, setDefaultSelawatTier] = useState(100);
+  const [defaultIstighfarTier, setDefaultIstighfarTier] = useState(100);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [toast, setToast] = useState("");
+  const [ayatData, setAyatData] = useState({});
+  const [ayatLoading, setAyatLoading] = useState({});
+  const [ayatError, setAyatError] = useState({});
+  const [expanded, setExpanded] = useState({});
+  const [view, setView] = useState("harian");
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = /* @__PURE__ */ new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+  const [downloadingAll, setDownloadingAll] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [quote, setQuote] = useState(() => pickRandomQuote());
+  const today = todayStr();
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 1600);
+  };
+  const persist = useCallback(async (next) => {
+    try {
+      await window.storage.set(STORAGE_KEY, JSON.stringify(next), false);
+    } catch (e) {
+      console.error("Gagal simpan:", e);
+    }
+  }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get(STORAGE_KEY, false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          setStartDate(parsed.startDate || null);
+          setDays(parsed.days || {});
+          setDefaultSelawatTier(parsed.defaultSelawatTier || 100);
+          setDefaultIstighfarTier(parsed.defaultIstighfarTier || 100);
+        }
+      } catch (e) {
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    if (!days[today] && startDate) {
+      setDays((prev) => {
+        const next = {
+          ...prev,
+          [today]: emptyDay(defaultSelawatTier, defaultIstighfarTier)
+        };
+        persist({ startDate, days: next, defaultSelawatTier, defaultIstighfarTier });
+        return next;
+      });
+    }
+  }, [loaded, startDate, today, days, defaultSelawatTier, defaultIstighfarTier, persist]);
+  const todayData = days[today] || emptyDay(defaultSelawatTier, defaultIstighfarTier);
+  const updateToday = (patch) => {
+    setDays((prev) => {
+      const base = prev[today] || emptyDay(defaultSelawatTier, defaultIstighfarTier);
+      const nextDay = { ...base, ...patch };
+      const next = { ...prev, [today]: nextDay };
+      persist({ startDate, days: next, defaultSelawatTier, defaultIstighfarTier });
+      return next;
+    });
+  };
+  const bump = (key, target, delta) => {
+    const cur = todayData[key] || 0;
+    const val = Math.max(0, Math.min(target, cur + delta));
+    if (val === target && cur < target) showToast("Alhamdulillah, siap \u2726");
+    updateToday({ [key]: val });
+  };
+  const setTier = (which, tier) => {
+    if (which === "selawat") {
+      setDefaultSelawatTier(tier);
+      updateToday({ selawatTier: tier });
+    } else {
+      setDefaultIstighfarTier(tier);
+      updateToday({ istighfarTier: tier });
+    }
+  };
+  const toggleAyat = async (amalan) => {
+    const id = amalan.id;
+    const willOpen = !expanded[id];
+    setExpanded((prev) => ({ ...prev, [id]: willOpen }));
+    if (!willOpen || ayatData[id] || !amalan.ayahRange) return;
+    const cacheKey = `${AYAT_CACHE_PREFIX}${amalan.ayahRange.surah}`;
+    setAyatLoading((prev) => ({ ...prev, [id]: true }));
+    setAyatError((prev) => ({ ...prev, [id]: null }));
+    try {
+      let full;
+      try {
+        const cached = await window.storage.get(cacheKey, false);
+        full = cached ? JSON.parse(cached.value) : null;
+      } catch (e) {
+        full = null;
+      }
+      if (!full) {
+        full = await fetchAyat(amalan.ayahRange.surah);
+        try {
+          await window.storage.set(cacheKey, JSON.stringify(full), false);
+        } catch (e) {
+        }
+      }
+      const { from, to } = amalan.ayahRange;
+      const slice = full.filter((a) => a.number >= from && a.number <= to);
+      setAyatData((prev) => ({ ...prev, [id]: slice }));
+    } catch (e) {
+      setAyatError((prev) => ({
+        ...prev,
+        [id]: "Preview chat ni sekat muat turun automatik. Lepas app di-deploy (Netlify/Cloudflare), ni akan jalan sendiri."
+      }));
+    } finally {
+      setAyatLoading((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+  const downloadAllAyat = async () => {
+    const targets = AMALAN.filter((a) => a.ayahRange);
+    setDownloadingAll(true);
+    setDownloadProgress(0);
+    let done = 0;
+    for (const a of targets) {
+      const cacheKey = `${AYAT_CACHE_PREFIX}${a.ayahRange.surah}`;
+      try {
+        const cached = await window.storage.get(cacheKey, false);
+        if (!cached) throw new Error("no cache");
+      } catch (e) {
+        try {
+          const full = await fetchAyat(a.ayahRange.surah);
+          await window.storage.set(cacheKey, JSON.stringify(full), false);
+        } catch (err) {
+          showToast("Muat turun disekat dalam preview \u2014 cuba lepas deploy");
+        }
+      }
+      done += 1;
+      setDownloadProgress(done);
+    }
+    setDownloadingAll(false);
+    showToast("Semua ayat tersimpan \u2726 boleh baca offline");
+  };
+  const beginChallenge = () => {
+    const s = today;
+    const initDays = { [s]: emptyDay(defaultSelawatTier, defaultIstighfarTier) };
+    setStartDate(s);
+    setDays(initDays);
+    persist({ startDate: s, days: initDays, defaultSelawatTier, defaultIstighfarTier });
+  };
+  const resetChallenge = () => {
+    setStartDate(null);
+    setDays({});
+    persist({ startDate: null, days: {}, defaultSelawatTier, defaultIstighfarTier });
+    setConfirmReset(false);
+  };
+  let dayIndex = 0;
+  if (startDate) {
+    const s = new Date(startDate);
+    const t = new Date(today);
+    dayIndex = Math.floor((t - s) / 864e5) + 1;
+  }
+  let streak = 0;
+  if (startDate) {
+    for (let i = 0; i < dayIndex; i++) {
+      const ds = todayStr(-i);
+      if (isDayComplete(days[ds])) streak++;
+      else if (ds !== today) break;
+    }
+  }
+  const gridDays = [];
+  if (startDate) {
+    for (let i = 1; i <= TOTAL_DAYS; i++) {
+      const ds = todayStr(i - dayIndex);
+      gridDays.push({ n: i, ds, complete: isDayComplete(days[ds]), isToday: ds === today });
+    }
+  }
+  const progress = dayProgress(todayData);
+  if (!loaded) {
+    return /* @__PURE__ */ React.createElement("div", { style: styles.loading }, /* @__PURE__ */ React.createElement("div", { style: styles.loadingText }, "Membuka wirid\u2026"));
+  }
+  if (!startDate) {
+    return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.stars }), /* @__PURE__ */ React.createElement("div", { style: styles.onboardWrap }, /* @__PURE__ */ React.createElement("div", { style: styles.eyebrow }, "WIRID MUSLIHAH"), /* @__PURE__ */ React.createElement("h1", { style: styles.onboardTitle }, "Cahaya 40 Hari"), /* @__PURE__ */ React.createElement(QuoteJar, { quote, onShuffle: () => setQuote(pickRandomQuote()) }), /* @__PURE__ */ React.createElement("p", { style: styles.onboardBody }, "Satu susunan zikir harian \u2014 tasbih, ayat perlindungan, selawat dan istighfar. Disiplin kecil, diulang 40 hari, jadi cahaya yang tak terpadam."), /* @__PURE__ */ React.createElement("div", { style: styles.onboardList }, AMALAN.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: styles.onboardItem }, /* @__PURE__ */ React.createElement("span", { style: styles.onboardDot }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.onboardItemName }, a.name), /* @__PURE__ */ React.createElement("div", { style: styles.onboardItemSub }, a.sub)))), /* @__PURE__ */ React.createElement("div", { style: styles.onboardItem }, /* @__PURE__ */ React.createElement("span", { style: styles.onboardDot }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.onboardItemName }, "Selawat"), /* @__PURE__ */ React.createElement("div", { style: styles.onboardItemSub }, "pilih 100 / 500 / 1000"))), /* @__PURE__ */ React.createElement("div", { style: styles.onboardItem }, /* @__PURE__ */ React.createElement("span", { style: styles.onboardDot }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.onboardItemName }, "Istighfar"), /* @__PURE__ */ React.createElement("div", { style: styles.onboardItemSub }, "pilih 100 / 500 / 1000")))), /* @__PURE__ */ React.createElement("button", { style: styles.primaryBtn, onClick: beginChallenge }, "Mula 40 Hari")));
+  }
+  return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.stars }), /* @__PURE__ */ React.createElement("div", { style: styles.container }, /* @__PURE__ */ React.createElement("div", { style: styles.header }, /* @__PURE__ */ React.createElement("div", { style: styles.eyebrow }, "WIRID MUSLIHAH"), /* @__PURE__ */ React.createElement("h1", { style: styles.title }, "Cahaya 40 Hari")), /* @__PURE__ */ React.createElement(QuoteJar, { quote, onShuffle: () => setQuote(pickRandomQuote()) }), /* @__PURE__ */ React.createElement("div", { style: styles.tabRow }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.tabBtn, ...view === "harian" ? styles.tabBtnActive : {} },
+      onClick: () => setView("harian")
+    },
+    "Harian"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.tabBtn, ...view === "kalendar" ? styles.tabBtnActive : {} },
+      onClick: () => setView("kalendar")
+    },
+    "Kalendar"
+  )), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: styles.downloadAllBtn,
+      onClick: downloadAllAyat,
+      disabled: downloadingAll
+    },
+    downloadingAll ? `Memuat turun ayat\u2026 ${downloadProgress}/5` : "\u21E9 Muat turun semua ayat (untuk offline)"
+  ), view === "kalendar" && /* @__PURE__ */ React.createElement(
+    CalendarView,
+    {
+      days,
+      startDate,
+      today,
+      calMonth,
+      setCalMonth
+    }
+  ), view === "harian" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.statsRow }, /* @__PURE__ */ React.createElement("div", { style: styles.ringWrap }, /* @__PURE__ */ React.createElement("svg", { width: "88", height: "88", viewBox: "0 0 88 88" }, /* @__PURE__ */ React.createElement("circle", { cx: "44", cy: "44", r: "38", stroke: "#20202f", strokeWidth: "7", fill: "none" }), /* @__PURE__ */ React.createElement(
+    "circle",
+    {
+      cx: "44",
+      cy: "44",
+      r: "38",
+      stroke: "url(#grad)",
+      strokeWidth: "7",
+      fill: "none",
+      strokeLinecap: "round",
+      strokeDasharray: 2 * Math.PI * 38,
+      strokeDashoffset: 2 * Math.PI * 38 * (1 - progress),
+      transform: "rotate(-90 44 44)"
+    }
+  ), /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("linearGradient", { id: "grad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" }, /* @__PURE__ */ React.createElement("stop", { offset: "0%", stopColor: "#c9a84c" }), /* @__PURE__ */ React.createElement("stop", { offset: "100%", stopColor: "#5fd8d0" })))), /* @__PURE__ */ React.createElement("div", { style: styles.ringLabel }, Math.round(progress * 100), "%")), /* @__PURE__ */ React.createElement("div", { style: styles.statBlock }, /* @__PURE__ */ React.createElement("div", { style: styles.statBig }, "Hari ", Math.min(dayIndex, TOTAL_DAYS), /* @__PURE__ */ React.createElement("span", { style: styles.statOf }, " / ", TOTAL_DAYS)), /* @__PURE__ */ React.createElement("div", { style: styles.statSmall }, "\u{1F525} ", streak, " hari berturut-turut"))), /* @__PURE__ */ React.createElement("div", { style: styles.gridCard }, /* @__PURE__ */ React.createElement("div", { style: styles.gridDots }, gridDays.map((d) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      key: d.n,
+      title: `Hari ${d.n}`,
+      style: {
+        ...styles.dot,
+        ...d.complete ? styles.dotComplete : {},
+        ...d.isToday && !d.complete ? styles.dotToday : {}
+      }
+    }
+  )))), AMALAN.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: styles.card }, /* @__PURE__ */ React.createElement("div", { style: styles.cardHead }, /* @__PURE__ */ React.createElement("div", { style: styles.cardHeadRow }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.cardName }, a.name), /* @__PURE__ */ React.createElement("div", { style: styles.cardSub }, a.sub)), a.ayahRange && /* @__PURE__ */ React.createElement("button", { style: styles.ayatToggle, onClick: () => toggleAyat(a) }, expanded[a.id] ? "Tutup ayat" : "Papar ayat"))), expanded[a.id] && /* @__PURE__ */ React.createElement("div", { style: styles.ayatBox }, ayatLoading[a.id] && /* @__PURE__ */ React.createElement("div", { style: styles.ayatStatus }, "Memuat ayat\u2026"), ayatError[a.id] && /* @__PURE__ */ React.createElement("div", { style: styles.ayatErrorBox }, /* @__PURE__ */ React.createElement("div", { style: styles.ayatStatus }, ayatError[a.id]), /* @__PURE__ */ React.createElement(
+    "a",
+    {
+      href: `https://quran.com/${a.ayahRange.surah}/${a.ayahRange.from}-${a.ayahRange.to}`,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: styles.ayatFallbackLink
+    },
+    "Baca di Quran.com \u2197"
+  )), ayatData[a.id] && ayatData[a.id].map((v) => /* @__PURE__ */ React.createElement("div", { key: v.number, style: styles.ayatItem }, /* @__PURE__ */ React.createElement("div", { style: styles.ayatNum }, v.number), /* @__PURE__ */ React.createElement("div", { style: styles.ayatArabic }, v.arabic), /* @__PURE__ */ React.createElement("div", { style: styles.ayatMalay }, v.malay)))), a.slots.map((s) => {
+    const key = `${a.id}_${s.key}`;
+    const val = todayData[key] || 0;
+    const done = val >= s.target;
+    return /* @__PURE__ */ React.createElement("div", { key, style: styles.slotRow }, /* @__PURE__ */ React.createElement("div", { style: styles.slotLabel }, s.key !== "all" && /* @__PURE__ */ React.createElement("span", null, s.label), /* @__PURE__ */ React.createElement("span", { style: styles.slotCount }, val, "/", s.target)), /* @__PURE__ */ React.createElement("div", { style: styles.slotBarTrack }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.slotBarFill,
+          width: `${Math.min(100, val / s.target * 100)}%`,
+          background: done ? "linear-gradient(90deg,#c9a84c,#5fd8d0)" : "#3a3a52"
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: styles.slotBtns }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: styles.smallBtn,
+        onClick: () => bump(key, s.target, -1)
+      },
+      "\u2212"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.smallBtn,
+          ...done ? styles.smallBtnDone : {}
+        },
+        onClick: () => bump(key, s.target, 1)
+      },
+      done ? "\u2713" : "+1"
+    )));
+  }))), /* @__PURE__ */ React.createElement(
+    TierCard,
+    {
+      title: "Selawat",
+      count: todayData.selawatCount,
+      tier: todayData.selawatTier,
+      onTier: (t) => setTier("selawat", t),
+      onBump: (d) => bump("selawatCount", todayData.selawatTier, d)
+    }
+  ), /* @__PURE__ */ React.createElement(
+    TierCard,
+    {
+      title: "Istighfar",
+      count: todayData.istighfarCount,
+      tier: todayData.istighfarTier,
+      onTier: (t) => setTier("istighfar", t),
+      onBump: (d) => bump("istighfarCount", todayData.istighfarTier, d)
+    }
+  )), /* @__PURE__ */ React.createElement("div", { style: styles.footer }, !confirmReset ? /* @__PURE__ */ React.createElement("button", { style: styles.resetBtn, onClick: () => setConfirmReset(true) }, "Mula semula 40 hari") : /* @__PURE__ */ React.createElement("div", { style: styles.confirmRow }, /* @__PURE__ */ React.createElement("span", { style: styles.confirmText }, "Padam progres & mula baru?"), /* @__PURE__ */ React.createElement("button", { style: styles.confirmYes, onClick: resetChallenge }, "Ya"), /* @__PURE__ */ React.createElement("button", { style: styles.confirmNo, onClick: () => setConfirmReset(false) }, "Batal")))), toast && /* @__PURE__ */ React.createElement("div", { style: styles.toast }, toast));
+}
+function QuoteJar({ quote, onShuffle }) {
+  return /* @__PURE__ */ React.createElement("div", { style: styles.quoteCard }, /* @__PURE__ */ React.createElement("div", { style: styles.quoteMark }, "\u201C"), /* @__PURE__ */ React.createElement("div", { style: styles.quoteText }, quote.text), /* @__PURE__ */ React.createElement("div", { style: styles.quoteFooter }, /* @__PURE__ */ React.createElement("span", { style: styles.quoteRef }, "\u2014 ", quote.ref), /* @__PURE__ */ React.createElement("button", { style: styles.quoteShuffle, onClick: onShuffle, "aria-label": "Tukar peringatan" }, "\u27F3")));
+}
+function TierCard({ title, count, tier, onTier, onBump }) {
+  const done = count >= tier;
+  return /* @__PURE__ */ React.createElement("div", { style: styles.card }, /* @__PURE__ */ React.createElement("div", { style: styles.cardHead }, /* @__PURE__ */ React.createElement("div", { style: styles.cardName }, title), /* @__PURE__ */ React.createElement("div", { style: styles.cardSub }, "pilih target harian")), /* @__PURE__ */ React.createElement("div", { style: styles.tierRow }, TIERS.map((t) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: t,
+      onClick: () => onTier(t),
+      style: {
+        ...styles.tierChip,
+        ...tier === t ? styles.tierChipActive : {}
+      }
+    },
+    t
+  ))), /* @__PURE__ */ React.createElement("div", { style: styles.slotRow }, /* @__PURE__ */ React.createElement("div", { style: styles.slotLabel }, /* @__PURE__ */ React.createElement("span", { style: styles.slotCount }, count, "/", tier)), /* @__PURE__ */ React.createElement("div", { style: styles.slotBarTrack }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        ...styles.slotBarFill,
+        width: `${Math.min(100, count / tier * 100)}%`,
+        background: done ? "linear-gradient(90deg,#c9a84c,#5fd8d0)" : "#3a3a52"
+      }
+    }
+  )), /* @__PURE__ */ React.createElement("div", { style: styles.slotBtns }, /* @__PURE__ */ React.createElement("button", { style: styles.smallBtn, onClick: () => onBump(-10) }, "\u221210"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.smallBtn, ...done ? styles.smallBtnDone : {} },
+      onClick: () => onBump(10)
+    },
+    "+10"
+  ))));
+}
+function toKey(dateObj) {
+  return dateObj.toISOString().slice(0, 10);
+}
+const HARI_LABEL = ["Ahd", "Isn", "Sel", "Rab", "Kha", "Jum", "Sab"];
+const BULAN_LABEL = [
+  "Januari",
+  "Februari",
+  "Mac",
+  "April",
+  "Mei",
+  "Jun",
+  "Julai",
+  "Ogos",
+  "September",
+  "Oktober",
+  "November",
+  "Disember"
+];
+function CalendarView({ days, startDate, today, calMonth, setCalMonth }) {
+  const { y, m } = calMonth;
+  const firstOfMonth = new Date(y, m, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(y, m, d));
+  let challengeEndKey = null;
+  if (startDate) {
+    const s = new Date(startDate);
+    const end = new Date(s);
+    end.setDate(end.getDate() + TOTAL_DAYS - 1);
+    challengeEndKey = toKey(end);
+  }
+  const changeMonth = (delta) => {
+    let nm = m + delta;
+    let ny = y;
+    if (nm < 0) {
+      nm = 11;
+      ny -= 1;
+    } else if (nm > 11) {
+      nm = 0;
+      ny += 1;
+    }
+    setCalMonth({ y: ny, m: nm });
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: styles.calCard }, /* @__PURE__ */ React.createElement("div", { style: styles.calNav }, /* @__PURE__ */ React.createElement("button", { style: styles.calNavBtn, onClick: () => changeMonth(-1) }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.calMonthLabel }, BULAN_LABEL[m], " ", y), /* @__PURE__ */ React.createElement("button", { style: styles.calNavBtn, onClick: () => changeMonth(1) }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.calWeekRow }, HARI_LABEL.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: styles.calWeekLabel }, h))), /* @__PURE__ */ React.createElement("div", { style: styles.calGrid }, cells.map((date, i) => {
+    if (!date) return /* @__PURE__ */ React.createElement("div", { key: i, style: styles.calCellEmpty });
+    const key = toKey(date);
+    const inChallenge = startDate && key >= startDate && key <= challengeEndKey;
+    const complete = inChallenge && isDayComplete(days[key]);
+    const isToday = key === today;
+    const isFuture = key > today;
+    const missed = inChallenge && !isFuture && !isToday && !complete;
+    return /* @__PURE__ */ React.createElement("div", { key: i, style: styles.calCellWrap }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.calCell,
+          ...complete ? styles.calCellComplete : {},
+          ...isToday && !complete ? styles.calCellToday : {},
+          ...missed ? styles.calCellMissed : {},
+          ...!inChallenge ? styles.calCellOutside : {}
+        }
+      },
+      date.getDate()
+    ));
+  })), /* @__PURE__ */ React.createElement("div", { style: styles.calLegend }, /* @__PURE__ */ React.createElement("span", { style: styles.calLegendItem }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.calDotLegend, ...styles.calCellComplete } }), " Lengkap"), /* @__PURE__ */ React.createElement("span", { style: styles.calLegendItem }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.calDotLegend, ...styles.calCellToday } }), " Hari ini"), /* @__PURE__ */ React.createElement("span", { style: styles.calLegendItem }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.calDotLegend, ...styles.calCellMissed } }), " Tertinggal")));
+}
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "#0a0a12",
+    color: "#e9e6de",
+    fontFamily: "'Georgia', 'Iowan Old Style', 'Palatino Linotype', serif",
+    position: "relative",
+    overflowX: "hidden"
+  },
+  stars: {
+    position: "fixed",
+    inset: 0,
+    backgroundImage: "radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.5) 50%, transparent), radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.35) 50%, transparent), radial-gradient(1.5px 1.5px at 40% 80%, rgba(201,168,76,0.4) 50%, transparent), radial-gradient(1px 1px at 85% 15%, rgba(95,216,208,0.35) 50%, transparent)",
+    backgroundSize: "260px 260px",
+    opacity: 0.7,
+    pointerEvents: "none"
+  },
+  loading: {
+    minHeight: "100vh",
+    background: "#0a0a12",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  loadingText: { color: "#c9a84c", fontFamily: "Georgia, serif", letterSpacing: 1 },
+  container: {
+    maxWidth: 480,
+    margin: "0 auto",
+    padding: "28px 18px 60px",
+    position: "relative"
+  },
+  onboardWrap: {
+    maxWidth: 480,
+    margin: "0 auto",
+    padding: "48px 22px 40px",
+    position: "relative"
+  },
+  eyebrow: {
+    fontFamily: "system-ui, sans-serif",
+    fontSize: 11,
+    letterSpacing: 4,
+    color: "#5fd8d0",
+    fontWeight: 600
+  },
+  title: {
+    fontSize: 30,
+    margin: "6px 0 20px",
+    color: "#f3ecd9",
+    fontWeight: 400,
+    letterSpacing: 0.5
+  },
+  onboardTitle: {
+    fontSize: 34,
+    margin: "8px 0 14px",
+    color: "#f3ecd9",
+    fontWeight: 400
+  },
+  onboardBody: {
+    fontSize: 15,
+    lineHeight: 1.6,
+    color: "#b8b3a6",
+    marginBottom: 24,
+    fontFamily: "system-ui, sans-serif"
+  },
+  onboardList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    marginBottom: 30,
+    borderTop: "1px solid #23232f",
+    paddingTop: 18
+  },
+  onboardItem: { display: "flex", gap: 12, alignItems: "flex-start" },
+  onboardDot: {
+    width: 6,
+    height: 6,
+    borderRadius: "50%",
+    background: "#c9a84c",
+    marginTop: 7,
+    flexShrink: 0
+  },
+  onboardItemName: { fontSize: 15, color: "#e9e6de" },
+  onboardItemSub: {
+    fontSize: 12.5,
+    color: "#8b8778",
+    fontFamily: "system-ui, sans-serif",
+    marginTop: 2
+  },
+  primaryBtn: {
+    width: "100%",
+    padding: "16px",
+    background: "linear-gradient(90deg,#c9a84c,#a98a35)",
+    color: "#0a0a12",
+    border: "none",
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    fontFamily: "system-ui, sans-serif",
+    cursor: "pointer"
+  },
+  header: { marginBottom: 14 },
+  quoteCard: {
+    position: "relative",
+    background: "linear-gradient(135deg, #14141f, #101018)",
+    border: "1px solid #2a2a3a",
+    borderRadius: 14,
+    padding: "18px 18px 14px",
+    marginBottom: 16
+  },
+  quoteMark: {
+    position: "absolute",
+    top: 2,
+    left: 12,
+    fontSize: 40,
+    color: "#c9a84c",
+    opacity: 0.35,
+    fontFamily: "Georgia, serif",
+    lineHeight: 1
+  },
+  quoteText: {
+    fontSize: 15.5,
+    lineHeight: 1.6,
+    color: "#f3ecd9",
+    fontFamily: "Georgia, serif",
+    fontStyle: "italic",
+    position: "relative",
+    zIndex: 1,
+    marginBottom: 10,
+    paddingLeft: 4
+  },
+  quoteFooter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    fontFamily: "system-ui, sans-serif"
+  },
+  quoteRef: {
+    fontSize: 11.5,
+    color: "#5fd8d0",
+    letterSpacing: 0.3
+  },
+  quoteShuffle: {
+    background: "transparent",
+    color: "#8b8778",
+    border: "1px solid #2c2c3d",
+    borderRadius: "50%",
+    width: 28,
+    height: 28,
+    fontSize: 14,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  tabRow: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 12,
+    fontFamily: "system-ui, sans-serif"
+  },
+  tabBtn: {
+    flex: 1,
+    padding: "10px 0",
+    background: "#12121d",
+    color: "#8b8778",
+    border: "1px solid #22222f",
+    borderRadius: 10,
+    fontSize: 13.5,
+    cursor: "pointer"
+  },
+  tabBtnActive: {
+    background: "linear-gradient(90deg,#c9a84c,#a98a35)",
+    color: "#0a0a12",
+    border: "none",
+    fontWeight: 700
+  },
+  downloadAllBtn: {
+    width: "100%",
+    padding: "10px 12px",
+    marginBottom: 16,
+    background: "#101820",
+    color: "#5fd8d0",
+    border: "1px solid #1e3634",
+    borderRadius: 10,
+    fontSize: 12.5,
+    fontFamily: "system-ui, sans-serif",
+    cursor: "pointer"
+  },
+  calCard: {
+    background: "#12121d",
+    border: "1px solid #22222f",
+    borderRadius: 14,
+    padding: "16px 14px",
+    marginBottom: 16,
+    fontFamily: "system-ui, sans-serif"
+  },
+  calNav: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12
+  },
+  calNavBtn: {
+    background: "#20202f",
+    color: "#e9e6de",
+    border: "1px solid #2c2c3d",
+    borderRadius: 8,
+    width: 32,
+    height: 32,
+    fontSize: 16,
+    cursor: "pointer"
+  },
+  calMonthLabel: { fontSize: 14.5, color: "#f3ecd9", fontFamily: "Georgia, serif" },
+  calWeekRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    marginBottom: 6
+  },
+  calWeekLabel: {
+    textAlign: "center",
+    fontSize: 10.5,
+    color: "#665f4f"
+  },
+  calGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 4
+  },
+  calCellEmpty: { aspectRatio: "1" },
+  calCellWrap: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  calCell: {
+    width: "100%",
+    aspectRatio: "1",
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 12,
+    color: "#b8b3a6",
+    background: "#181824",
+    border: "1px solid #23232f"
+  },
+  calCellComplete: {
+    background: "radial-gradient(circle, #f0d98c, #c9a84c)",
+    color: "#0a0a12",
+    border: "none",
+    fontWeight: 700
+  },
+  calCellToday: {
+    border: "1.5px solid #5fd8d0",
+    color: "#5fd8d0",
+    fontWeight: 700
+  },
+  calCellMissed: {
+    border: "1px solid #6b3838",
+    color: "#a56060"
+  },
+  calCellOutside: {
+    opacity: 0.3
+  },
+  calLegend: {
+    display: "flex",
+    gap: 14,
+    marginTop: 14,
+    flexWrap: "wrap"
+  },
+  calLegendItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11,
+    color: "#8b8778"
+  },
+  calDotLegend: {
+    width: 12,
+    height: 12,
+    borderRadius: 4,
+    display: "inline-block"
+  },
+  statsRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 18,
+    background: "#12121d",
+    border: "1px solid #22222f",
+    borderRadius: 14,
+    padding: "16px 18px",
+    marginBottom: 16
+  },
+  ringWrap: { position: "relative", width: 88, height: 88, flexShrink: 0 },
+  ringLabel: {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 15,
+    fontFamily: "system-ui, sans-serif",
+    color: "#f3ecd9",
+    fontWeight: 700
+  },
+  statBlock: { display: "flex", flexDirection: "column", gap: 6 },
+  statBig: { fontSize: 20, color: "#f3ecd9" },
+  statOf: { fontSize: 14, color: "#8b8778" },
+  statSmall: {
+    fontSize: 13,
+    color: "#c9a84c",
+    fontFamily: "system-ui, sans-serif"
+  },
+  gridCard: {
+    background: "#12121d",
+    border: "1px solid #22222f",
+    borderRadius: 14,
+    padding: "16px 14px",
+    marginBottom: 18
+  },
+  gridDots: {
+    display: "grid",
+    gridTemplateColumns: "repeat(10, 1fr)",
+    gap: 8
+  },
+  dot: {
+    width: "100%",
+    aspectRatio: "1",
+    borderRadius: "50%",
+    background: "#20202f",
+    border: "1px solid #2c2c3d"
+  },
+  dotComplete: {
+    background: "radial-gradient(circle, #f0d98c, #c9a84c)",
+    border: "1px solid #e0c060",
+    boxShadow: "0 0 6px rgba(201,168,76,0.6)"
+  },
+  dotToday: {
+    border: "1.5px solid #5fd8d0",
+    boxShadow: "0 0 5px rgba(95,216,208,0.5)"
+  },
+  card: {
+    background: "#12121d",
+    border: "1px solid #22222f",
+    borderRadius: 14,
+    padding: "16px 18px",
+    marginBottom: 12
+  },
+  cardHead: { marginBottom: 10 },
+  cardHeadRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10
+  },
+  cardName: { fontSize: 16, color: "#f3ecd9" },
+  cardSub: {
+    fontSize: 12,
+    color: "#8b8778",
+    fontFamily: "system-ui, sans-serif",
+    marginTop: 2
+  },
+  ayatToggle: {
+    flexShrink: 0,
+    background: "transparent",
+    color: "#5fd8d0",
+    border: "1px solid #244543",
+    borderRadius: 8,
+    padding: "6px 10px",
+    fontSize: 11.5,
+    fontFamily: "system-ui, sans-serif",
+    cursor: "pointer",
+    whiteSpace: "nowrap"
+  },
+  ayatBox: {
+    marginBottom: 12,
+    padding: "12px",
+    background: "#0e0e17",
+    border: "1px solid #1e1e2b",
+    borderRadius: 10,
+    maxHeight: 260,
+    overflowY: "auto"
+  },
+  ayatStatus: {
+    fontSize: 12.5,
+    color: "#8b8778",
+    fontFamily: "system-ui, sans-serif",
+    textAlign: "center",
+    padding: "6px 0"
+  },
+  ayatErrorBox: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 0"
+  },
+  ayatFallbackLink: {
+    color: "#5fd8d0",
+    fontSize: 12.5,
+    fontFamily: "system-ui, sans-serif",
+    textDecoration: "none",
+    border: "1px solid #244543",
+    borderRadius: 8,
+    padding: "6px 12px"
+  },
+  ayatItem: {
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottom: "1px solid #1a1a26"
+  },
+  ayatNum: {
+    fontSize: 10.5,
+    color: "#c9a84c",
+    fontFamily: "system-ui, sans-serif",
+    marginBottom: 4
+  },
+  ayatArabic: {
+    fontFamily: "'Traditional Arabic', 'Scheherazade New', 'Amiri', serif",
+    fontSize: 22,
+    lineHeight: 1.9,
+    textAlign: "right",
+    direction: "rtl",
+    color: "#f3ecd9",
+    marginBottom: 6
+  },
+  ayatMalay: {
+    fontSize: 12.5,
+    lineHeight: 1.6,
+    color: "#b8b3a6",
+    fontFamily: "system-ui, sans-serif"
+  },
+  slotRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+    fontFamily: "system-ui, sans-serif"
+  },
+  slotLabel: {
+    fontSize: 12.5,
+    color: "#b8b3a6",
+    minWidth: 74,
+    display: "flex",
+    flexDirection: "column",
+    gap: 2
+  },
+  slotCount: { color: "#5fd8d0", fontWeight: 600, fontSize: 12.5 },
+  slotBarTrack: {
+    flex: 1,
+    height: 7,
+    background: "#20202f",
+    borderRadius: 4,
+    overflow: "hidden"
+  },
+  slotBarFill: { height: "100%", borderRadius: 4, transition: "width 0.2s" },
+  slotBtns: { display: "flex", gap: 6 },
+  smallBtn: {
+    minWidth: 40,
+    padding: "7px 10px",
+    background: "#20202f",
+    color: "#e9e6de",
+    border: "1px solid #2c2c3d",
+    borderRadius: 8,
+    fontSize: 13,
+    fontFamily: "system-ui, sans-serif",
+    cursor: "pointer"
+  },
+  smallBtnDone: {
+    background: "linear-gradient(90deg,#c9a84c,#5fd8d0)",
+    color: "#0a0a12",
+    border: "none",
+    fontWeight: 700
+  },
+  tierRow: { display: "flex", gap: 8, marginBottom: 4 },
+  tierChip: {
+    flex: 1,
+    padding: "9px 0",
+    background: "#20202f",
+    color: "#b8b3a6",
+    border: "1px solid #2c2c3d",
+    borderRadius: 8,
+    fontSize: 13,
+    fontFamily: "system-ui, sans-serif",
+    cursor: "pointer"
+  },
+  tierChipActive: {
+    background: "linear-gradient(90deg,#c9a84c,#a98a35)",
+    color: "#0a0a12",
+    border: "none",
+    fontWeight: 700
+  },
+  footer: { marginTop: 20, textAlign: "center" },
+  resetBtn: {
+    background: "transparent",
+    color: "#665f4f",
+    border: "1px solid #23232f",
+    borderRadius: 8,
+    padding: "10px 16px",
+    fontSize: 12.5,
+    fontFamily: "system-ui, sans-serif",
+    cursor: "pointer"
+  },
+  confirmRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    fontFamily: "system-ui, sans-serif"
+  },
+  confirmText: { fontSize: 12.5, color: "#b8b3a6" },
+  confirmYes: {
+    background: "#c9494c",
+    color: "#fff",
+    border: "none",
+    borderRadius: 8,
+    padding: "8px 14px",
+    fontSize: 12.5,
+    cursor: "pointer"
+  },
+  confirmNo: {
+    background: "#20202f",
+    color: "#e9e6de",
+    border: "1px solid #2c2c3d",
+    borderRadius: 8,
+    padding: "8px 14px",
+    fontSize: 12.5,
+    cursor: "pointer"
+  },
+  toast: {
+    position: "fixed",
+    bottom: 24,
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#f3ecd9",
+    color: "#0a0a12",
+    padding: "10px 18px",
+    borderRadius: 20,
+    fontSize: 13,
+    fontFamily: "system-ui, sans-serif",
+    fontWeight: 600,
+    boxShadow: "0 4px 20px rgba(0,0,0,0.4)"
+  }
+};
+
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(React.createElement(WiridMuslihahTracker));
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "Wirid Muslihah — Cahaya 40 Hari",
+  "short_name": "Wirid Muslihah",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a12",
+  "theme_color": "#0a0a12",
+  "orientation": "portrait",
+  "icons": []
+}
